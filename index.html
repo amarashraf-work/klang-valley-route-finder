@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Klang Valley Route Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+<style>
+:root{
+  --bg:#E8ECF2; --panel:#FFFFFF; --map:#F8F9FB; --ink:#141C33; --muted:#586179; --rule:#D8DDE6;
+  --accent:#23307A; --accent-ink:#FFFFFF; --field:#F1F3F7; --dot:#FFFFFF; --halo:#F8F9FB;
+  --hub:#1A2340; --focus:#3D5BFF; --warn:#9A3412; --dim:.2;
+  --ui:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --label:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0B0F18; --panel:#121827; --map:#151C2B; --ink:#E7EAF2; --muted:#9AA3B8; --rule:#273048;
+    --accent:#B3C2FF; --accent-ink:#0B0F18; --field:#1A2235; --dot:#F4F6FA; --halo:#151C2B;
+    --hub:#070A12; --focus:#8EA2FF; --warn:#FDBA74; --dim:.26;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0B0F18; --panel:#121827; --map:#151C2B; --ink:#E7EAF2; --muted:#9AA3B8; --rule:#273048;
+  --accent:#B3C2FF; --accent-ink:#0B0F18; --field:#1A2235; --dot:#F4F6FA; --halo:#151C2B;
+  --hub:#070A12; --focus:#8EA2FF; --warn:#FDBA74; --dim:.26;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:15px;line-height:1.45}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+.app{display:grid;grid-template-columns:minmax(320px,380px) 1fr;gap:16px;height:100%;padding:16px}
+.panel{background:var(--panel);border-radius:14px;display:flex;flex-direction:column;min-height:0;overflow:hidden;border:1px solid var(--rule)}
+.panel-scroll{overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:20px;min-height:0}
+.p-top,.p-bottom{display:flex;flex-direction:column;gap:20px}
+.stepwrap>summary{cursor:pointer;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;padding-block:4px;margin-bottom:10px;width:max-content}
+.stepwrap:not([open])>summary{margin-bottom:0}
+
+.brand{display:flex;flex-direction:column;gap:2px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{margin:0;font-family:var(--label);font-weight:700;font-size:28px;line-height:1.1;text-wrap:balance}
+
+.trip{display:grid;grid-template-columns:22px 1fr 40px;grid-template-rows:auto auto;column-gap:10px;row-gap:8px;align-items:center}
+.pin{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--ink);color:var(--panel)}
+.pin.b{background:transparent;border:2.5px solid var(--ink);color:var(--ink)}
+.rail{grid-column:1;grid-row:1 / span 2;justify-self:center;width:2px;height:40px;background:repeating-linear-gradient(var(--muted) 0 3px,transparent 3px 7px);align-self:center}
+.pins{grid-column:1;grid-row:1 / span 2;display:flex;flex-direction:column;align-items:center;justify-content:space-between;height:100%;padding-block:12px;position:relative}
+.pins::before{content:"";position:absolute;top:34px;bottom:34px;width:2px;background:repeating-linear-gradient(var(--muted) 0 3px,transparent 3px 7px)}
+.field{position:relative}
+.field label{position:absolute;left:12px;top:6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;pointer-events:none}
+.field input{width:100%;border:1px solid var(--rule);background:var(--field);border-radius:10px;padding:22px 34px 8px 12px;font-size:16px;font-weight:500}
+.field input:focus{border-color:var(--focus);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--focus) 22%,transparent)}
+.clear-x{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;width:26px;height:26px;border-radius:50%;cursor:pointer;color:var(--muted);font-size:18px;line-height:1}
+.clear-x:hover{background:var(--rule)}
+.swap{grid-column:3;grid-row:1 / span 2;width:40px;height:40px;border-radius:50%;border:1px solid var(--rule);background:var(--panel);cursor:pointer;display:grid;place-items:center}
+.swap:hover{background:var(--field)}
+.swap svg{width:18px;height:18px}
+
+.suggest{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;background:var(--panel);border:1px solid var(--rule);border-radius:10px;box-shadow:0 12px 32px rgba(10,16,40,.18);max-height:300px;overflow-y:auto;padding:4px;margin:0;list-style:none}
+.suggest li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer}
+.suggest li[aria-selected="true"],.suggest li:hover{background:var(--field)}
+.suggest mark{background:none;color:inherit;font-weight:700;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:2px;text-decoration-color:var(--focus)}
+.suggest .empty{color:var(--muted);cursor:default}
+.badges{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end}
+.badge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding-inline:5px;border-radius:11px;font-size:12px;font-weight:700;color:#fff;font-family:var(--label);line-height:1}
+.badge.lg{min-width:28px;height:28px;border-radius:14px;font-size:14px}
+
+.actions{display:flex;gap:8px}
+.btn{flex:1;border:0;border-radius:10px;padding:12px 16px;font-weight:600;cursor:pointer;background:var(--accent);color:var(--accent-ink);font-size:15px}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{flex:0 0 auto;background:transparent;color:var(--ink);border:1px solid var(--rule)}
+.btn.ghost:hover{background:var(--field)}
+.msg{font-size:14px;color:var(--warn);margin:0}
+.msg:empty{display:none}
+
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--rule);background:var(--panel);border-radius:10px;padding:8px 12px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:0;min-width:0;flex:1}
+.tab[aria-selected="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.tab .t-kind{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tab .t-time{font-family:var(--label);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.tab .t-lines{display:flex;gap:3px;margin-top:3px}
+.summary{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.summary b{color:var(--ink);font-weight:600}
+.note{font-size:13px;color:var(--muted);margin:0}
+
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.step{display:grid;grid-template-columns:28px 1fr;column-gap:12px;position:relative}
+.step .gut{display:flex;flex-direction:column;align-items:center}
+.step .node{width:16px;height:16px;border-radius:50%;background:var(--dot);border:3px solid var(--ink);margin-top:3px;flex:none}
+.step .bar{flex:1;width:6px;border-radius:3px;min-height:24px;margin-block:2px}
+.step .bar.walk{width:0;border-left:3px dotted var(--muted);border-radius:0}
+.step .body{padding-bottom:14px;min-width:0}
+.step .st{font-weight:600}
+.step .sub{font-size:14px;color:var(--muted)}
+.step .leg{display:flex;align-items:center;gap:8px;font-weight:600;margin-top:2px}
+.step details{font-size:14px;color:var(--muted);margin-top:4px}
+.step summary{cursor:pointer;width:max-content}
+.step details ol{margin:4px 0 0;padding-left:18px}
+
+.legend h2,.results h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 0 8px}
+.legend ul{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.legend button{width:100%;display:flex;align-items:center;gap:10px;border:0;background:none;padding:6px 8px;border-radius:8px;cursor:pointer;text-align:left;font-size:14px}
+.legend button:hover{background:var(--field)}
+.legend button[aria-pressed="true"]{background:var(--field);box-shadow:inset 0 0 0 1px var(--rule)}
+.legend .kind{margin-left:auto;font-size:12px;color:var(--muted)}
+.results{display:flex;flex-direction:column;gap:14px}
+
+.mapwrap{position:relative;border-radius:14px;overflow:hidden;background:var(--map);border:1px solid var(--rule);min-height:0}
+#map{width:100%;height:100%;display:block;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+#map.dragging{cursor:grabbing}
+.ctrls{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px}
+.ctrls button{width:38px;height:38px;border-radius:10px;border:1px solid var(--rule);background:var(--panel);cursor:pointer;font-size:18px;font-weight:600;display:grid;place-items:center}
+.ctrls button:hover{background:var(--field)}
+.hint{position:absolute;left:12px;bottom:12px;right:12px;display:flex;justify-content:flex-start;pointer-events:none}
+.hint span{background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--rule);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--muted)}
+
+#base{transition:opacity .25s ease,filter .25s ease}
+#base.dim{opacity:var(--dim);filter:grayscale(1)}
+.lbl{font-family:var(--label);font-size:17px;font-weight:500;fill:var(--ink);paint-order:stroke;stroke:var(--halo);stroke-width:5px;stroke-linejoin:round}
+.lbl.x{font-weight:700;font-size:18px}
+.lbl.hub{font-size:22px;font-weight:700}
+.hit{fill:transparent;cursor:pointer}
+.stn{fill:var(--dot)}
+.conn-o{stroke:var(--ink)}
+.conn-i{stroke:var(--dot)}
+.route-lbl{font-weight:700}
+.pin-m{fill:var(--ink)}
+.route-hit{fill:none;stroke:transparent;stroke-width:36;stroke-linecap:round;stroke-linejoin:round;cursor:grab;pointer-events:stroke}
+.via-m{cursor:grab}
+.ghost{stroke:var(--ink);stroke-width:4;stroke-dasharray:10 9;fill:none;stroke-linecap:round}
+.ghost-dot{fill:var(--ink)}
+.snap{fill:none;stroke:var(--focus);stroke-width:5}
+.snap-lbl{font-family:var(--label);font-size:22px;font-weight:700;fill:var(--focus);paint-order:stroke;stroke:var(--map);stroke-width:6px;stroke-linejoin:round}
+.vias{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}
+.vias .lbl-t{color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--rule);background:var(--field);border-radius:999px;padding:3px 4px 3px 10px;font-weight:600;font-size:13px}
+.chip button{border:0;background:none;width:22px;height:22px;border-radius:50%;cursor:pointer;color:var(--muted);font-size:16px;line-height:1}
+.chip button:hover{background:var(--rule);color:var(--ink)}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);font-weight:600;cursor:pointer;font-size:14px;text-decoration:underline;text-underline-offset:3px}
+.tip{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--muted);background:var(--field);border-radius:10px;padding:8px 10px;margin:0}
+.tip svg{flex:none;margin-top:1px}
+.pin-t{fill:var(--map);font-family:var(--ui);font-size:15px;font-weight:700}
+
+@media (max-width:820px){
+  html,body{height:auto}
+  /* phone: search + routes, then the map, then the line key */
+  .app{display:flex;flex-direction:column;gap:12px;height:auto;padding:12px 16px}
+  .panel,.panel-scroll{display:contents}
+  .p-top,.p-bottom{background:var(--panel);border:1px solid var(--rule);border-radius:14px;padding:16px;gap:16px}
+  .p-top{order:1}
+  .mapwrap{order:2;height:64vh;min-height:380px;flex:none}
+  .p-bottom{order:3}
+  h1{font-size:24px}
+  .tab{padding:7px 10px}
+  .tab .t-time{font-size:18px}
+  .ctrls button{width:40px;height:40px}
+}
+@media (prefers-reduced-motion: reduce){ #base{transition:none} }
+</style>
+<style>body{margin:0}</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="panel" aria-label="Trip planner">
+    <div class="panel-scroll">
+     <div class="p-top">
+      <div class="brand">
+        <span class="eyebrow">Klang Valley integrated rail</span>
+        <h1>Route Finder</h1>
+      </div>
+
+      <form id="tripForm" class="trip" autocomplete="off" novalidate>
+        <div class="pins"><span class="pin">A</span><span class="pin b">B</span></div>
+        <div class="field" style="grid-column:2;grid-row:1">
+          <label for="fromInput">From</label>
+          <input id="fromInput" type="text" placeholder="Starting station" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="fromList" spellcheck="false">
+          <button type="button" class="clear-x" data-clear="fromInput" aria-label="Clear origin">×</button>
+          <ul class="suggest" id="fromList" role="listbox" hidden></ul>
+        </div>
+        <div class="field" style="grid-column:2;grid-row:2">
+          <label for="toInput">To</label>
+          <input id="toInput" type="text" placeholder="Destination station" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="toList" spellcheck="false">
+          <button type="button" class="clear-x" data-clear="toInput" aria-label="Clear destination">×</button>
+          <ul class="suggest" id="toList" role="listbox" hidden></ul>
+        </div>
+        <button type="button" class="swap" id="swapBtn" aria-label="Swap origin and destination" title="Swap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M21 16l-4 4-4-4"/></svg>
+        </button>
+      </form>
+      <div class="actions">
+        <button class="btn" id="searchBtn" type="submit" form="tripForm">Search route</button>
+        <button class="btn ghost" id="resetBtn" type="button">Reset</button>
+      </div>
+      <p class="msg" id="msg" role="alert"></p>
+
+      <section class="results" id="results" aria-live="polite" hidden></section>
+     </div>
+     <div class="p-bottom">
+
+      <section class="legend">
+        <h2>Lines</h2>
+        <ul id="legend"></ul>
+      </section>
+      <p class="note">Travel times are estimates that include average waiting and walking time. Tap a station on the map to use it as your origin or destination.</p>
+     </div>
+    </div>
+  </aside>
+
+  <main class="mapwrap">
+    <svg id="map" role="img" aria-label="Klang Valley integrated transit map" preserveAspectRatio="xMidYMid meet">
+      <g id="base"></g>
+      <g id="overlay"></g>
+      <g id="hits"></g>
+      <g id="routeHits"></g>
+      <g id="drag" pointer-events="none"></g>
+    </svg>
+    <div class="ctrls">
+      <button type="button" id="zin" aria-label="Zoom in">+</button>
+      <button type="button" id="zout" aria-label="Zoom out">−</button>
+      <button type="button" id="zfit" aria-label="Fit to view" title="Fit">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+    <div class="hint"><span id="hint">Drag to pan, scroll or pinch to zoom</span></div>
+  </main>
+</div>
+
+<script>
+/* ---------- Network data (traced from the 2026 Klang Valley Integrated Transit Map) ----------
+   Stop: [name, x, y, code, labelSide]   Waypoint: [x, y]
+   name "id|Label" gives a stop a unique id when two stations share a name.
+   labelSide: r l t b tr tl br bl R, or "-" for no label at this position. */
+const LINES = [
+ {id:'1',name:'KTM Batu Caves – Pulau Sebang',kind:'KTM Komuter',color:'#1F3C88',ride:4,wait:10,pts:[
+  ['Batu Caves',1463,574,1],['Taman Wahyu',1463,718,2],['Kampung Batu',1463,862,3],['Batu Kentonmen',1463,942,4],
+  ['Sentul KTM|Sentul',1463,1030,5],['Putra',1463,1207,6,'-'],['Bank Negara',1463,1326,7,'-'],['Kuala Lumpur',1463,1681,8,'-'],
+  [1463,1800],['KL Sentral',1450,1821,9,'-'],[1463,1928],['Mid Valley',1571,1928,10,'t'],['Seputeh',1701,1928,11,'t'],
+  ['Salak Selatan KTM|Salak Selatan',2148,1928,12,'t'],[2240,1928],['Bandar Tasik Selatan',2240,2022,13,'-'],[2240,2135],[2370,2135],
+  ['Serdang',2370,2200,14,'l'],['Kajang',2370,2290,15,'l'],['Kajang 2',2370,2344,16],['UKM',2370,2397,17],['Bangi',2370,2449,18],
+  ['Batang Benar',2370,2503,19],['Nilai',2370,2554,20],['Labu',2370,2607,21],['Tiroi',2370,2659,22],['Seremban',2370,2711,23],
+  ['Senawang',2370,2764,24],['Sungai Gadut',2370,2817,25],['Rembau',2370,2869,26],[2370,2940],['Pulau Sebang',2477,2940,27,'R']]},
+ {id:'2',name:'KTM Tanjung Malim – Pelabuhan Klang',kind:'KTM Komuter',color:'#B3202F',ride:4,wait:10,pts:[
+  ['Tanjung Malim',450,578,1,'R'],[355,578],['Kuala Kubu Bharu',355,644,2,'l'],['Rasa',355,709,3,'l'],['Batang Kali',355,772,4,'l'],
+  ['Serendah',355,831,5,'l'],['Rawang',355,893,6,'l'],[355,960],['Kuang',513,960,7,'t'],['Sungai Buloh',717,960,8,'t'],[842,960],[842,638],
+  ['Kepong Sentral',1058,638,9,'t'],[1145,638],['Kepong',1145,894,10,'l'],['Segambut',1145,1015,11,'l'],[1145,1140],[1432,1140],
+  ['Putra',1432,1207,12,'l'],['Bank Negara',1432,1326,13,'l'],['Kuala Lumpur',1432,1681,14,'l'],[1432,1800],['KL Sentral',1450,1851,15,'-'],
+  [1452,1990],['Abdullah Hukum',1452,2145,16,'-'],['Angkasapuri',1452,2222,17,'R'],['Pantai Dalam',1452,2268,18,'R'],[1452,2340],
+  ['Petaling',1293,2340,19,'t'],['Jalan Templer',1171,2340,20,'t'],['Kampung Dato Harun',1038,2340,21,'t'],['Seri Setia',903,2340,22,'t'],
+  [852,2340],[852,2390],['Setia Jaya',822,2390,23,'t'],['Subang Jaya',658,2390,24,'-'],[557,2390],['Batu Tiga',557,2433,25,'l'],
+  ['Shah Alam',557,2484,26,'l'],['Padang Jawa',557,2535,27,'l'],[557,2578],['Bukit Badak',476,2578,28,'b'],[430,2578],['Klang',430,2651,29,'r'],
+  [430,2710],[382,2710],['Teluk Pulai',382,2741,30,'l'],['Teluk Gadong',382,2805,31,'l'],['Kampung Raja Uda',382,2881,32,'l'],
+  ['Jalan Kastam',382,2956,33,'l'],['Pelabuhan Klang',382,3020,34,'l']]},
+ {id:'3',name:'LRT Ampang Line',kind:'LRT',color:'#E4712A',ride:2,wait:4,pts:[
+  ['Sentul Timur',1678,860,1,'r'],['Sentul',1678,924,2,'r'],['Titiwangsa',1678,1088,3,'tr'],['PWTC',1678,1207,4,'r'],
+  ['Sultan Ismail',1678,1288,5,'r'],['Bandaraya',1678,1326,6,'r'],[1678,1390],['Masjid Jamek',1696,1448,7,'r'],[1740,1540],
+  ['Plaza Rakyat',1897,1548,8,'t'],['Hang Tuah',2096,1548,9,'-'],['Pudu',2248,1548,10,'t'],['Chan Sow Lin',2310,1548,11,'-'],[2496,1548],
+  ['Miharja',2496,1498,12,'l'],['Maluri',2496,1408,13,'tr'],['Pandan Jaya',2496,1203,14],['Pandan Indah',2496,1031,15],
+  ['Cempaka',2496,879,16],['Cahaya',2496,716,17],['Ampang',2496,581,18]]},
+ {id:'4',name:'LRT Sri Petaling Line',kind:'LRT',color:'#72192A',ride:2.2,wait:4,pts:[
+  ['Sentul Timur',1635,860,1,'-'],['Sentul',1635,924,2,'-'],['Titiwangsa',1635,1113,3,'-'],['PWTC',1635,1207,4,'-'],
+  ['Sultan Ismail',1635,1288,5,'-'],['Bandaraya',1635,1326,6,'-'],[1635,1420],['Masjid Jamek',1672,1496,7,'-'],[1760,1593],
+  ['Plaza Rakyat',1897,1593,8,'-'],['Hang Tuah',2096,1593,9,'br'],['Pudu',2248,1593,10,'-'],['Chan Sow Lin',2310,1593,11,'-'],[2386,1593],
+  ['Cheras',2386,1665,12,'r'],[2386,1750],[2308,1750],['Salak Selatan LRT|Salak Selatan',2308,1799,13,'r'],['Bandar Tun Razak',2308,1861,14,'r'],
+  ['Bandar Tasik Selatan',2308,1952,15,'r'],[2308,1995],[1990,1995],['Sungai Besi',1990,2237,16,'-'],[1990,2340],
+  ['Bukit Jalil',1714,2340,17,'b'],['Sri Petaling',1619,2340,18,'b'],['Awan Besar',1523,2340,19,'b'],[1440,2346],[1385,2380],[1352,2430],
+  ['Muhibbah',1345,2483,20],['Alam Sutera',1345,2543,21],['Kinrara BK5',1345,2617,22],['IOI Puchong Jaya',1345,2705,24],
+  ['Pusat Bandar Puchong',1345,2805,25],['Taman Perindustrian Puchong',1345,2906,26],['Bandar Puteri',1345,2984,27],[1345,3093],
+  ['Puchong Perdana',1258,3093,28,'b'],['Puchong Prima',1143,3093,29,'b'],['Putra Heights',1020,3093,31,'b']]},
+ {id:'5',name:'LRT Kelana Jaya Line',kind:'LRT',color:'#D6212F',ride:2,wait:3,pts:[
+  ['Gombak',2047,575,1],['Taman Melati',2047,655,2],['Wangsa Maju',2047,710,3],['Sri Rampai',2047,770,4],['Setiawangsa',2047,829,5],
+  ['Jelatek',2047,889,6],["Dato' Keramat",2047,946,7],['Damai',2047,1003,8],['Ampang Park',2047,1133,9,'l'],['KLCC',2047,1172,10],
+  ['Kampung Baru',2047,1207,11],['Dang Wangi',2047,1277,12,'l'],[2047,1332],[1830,1332],[1720,1400],['Masjid Jamek',1683,1472,13,'-'],
+  [1646,1560],['Pasar Seni',1646,1726,14,'-'],[1646,1752],[1470,1752],[1470,1800],['KL Sentral',1450,1881,15,'-'],[1428,1995],
+  ['Bangsar',1428,2030,16,'l'],['Abdullah Hukum',1428,2145,17,'l'],[1428,2233],[1258,2233],['Kerinchi',1258,2135,18,'l'],[1258,2056],
+  ['Universiti',1213,2056,19,'t'],['Taman Jaya',1117,2056,20,'t'],['Asia Jaya',1041,2056,21,'t'],['Taman Paramount',938,2056,22,'t'],
+  ['Taman Bahagia',811,2056,23,'t'],['Kelana Jaya',712,2056,24,'t'],[630,2056],['Lembah Subang',630,2114,25],['Ara Damansara',630,2175,26],
+  ['Glenmarie',630,2242,27],['Subang Jaya',630,2450,28],['SS 15',630,2535,29],['SS 18',630,2591,30],[630,2655],[700,2655],
+  ['USJ 7',700,2697,31,'br'],['Taipan',700,2857,32],['Wawasan',700,2934,33],['USJ 21',700,2998,34],[700,3093],
+  ['Alam Megah',784,3093,35,'b'],['Subang Alam',890,3093,36,'b'],['Putra Heights',997,3093,37,'-']]},
+ {id:'6',name:'ERL KLIA Ekspres',kind:'Airport rail',color:'#7E2D86',ride:28,wait:8,cost:{'KL Sentral~KLIA T1':28,'KLIA T1~KLIA T2':3},pts:[
+  ['KL Sentral',1450,1911,null,'-'],[1482,1968],[2190,1968],['KLIA T1',2190,3070,null,'-'],[2190,3117],['KLIA T2',2033,3117,null,'l']]},
+ {id:'7',name:'ERL KLIA Transit',kind:'Airport rail',color:'#0B9BA6',ride:7,wait:10,cost:{'KL Sentral~Bandar Tasik Selatan':8,'Bandar Tasik Selatan~Putrajaya Sentral':14,'Putrajaya Sentral~Salak Tinggi':6,'Salak Tinggi~KLIA T1':9,'KLIA T1~KLIA T2':3},pts:[
+  ['KL Sentral',1450,1941,null,'-'],[1482,1946],[2215,1946],['Bandar Tasik Selatan',2215,2022,null,'-'],['Putrajaya Sentral',2215,2883,null,'r'],
+  ['Salak Tinggi',2215,2997,null,'r'],['KLIA T1',2215,3070,null,'r'],[2215,3142],['KLIA T2',2033,3142,null,'-']]},
+ {id:'8',name:'KL Monorail',kind:'Monorail',color:'#7DB63D',ride:1.8,wait:5,pts:[
+  ['KL Sentral',1575,1863,1,'-'],[1796,1863],['Tun Sambanthan',1796,1812,2,'r'],[1796,1718],['Maharajalela',1883,1718,3,'b'],[2040,1718],[2096,1655],
+  ['Hang Tuah',2096,1572,4,'-'],['Imbi',2096,1490,5,'r'],['Bukit Bintang',2096,1397,6,'-'],['Raja Chulan',2096,1331,7,'r'],
+  ['Bukit Nanas',2096,1278,8,'r'],[2096,1230],['Medan Tuanku',1930,1230,9,'t'],[1830,1230],['Chow Kit',1830,1150,10,'r'],[1830,1113],
+  ['Titiwangsa',1678,1113,11,'-']]},
+ {id:'9',name:'MRT Kajang Line',kind:'MRT',color:'#0A7A3F',ride:2.2,wait:4,pts:[
+  ['Kwasa Damansara',810,1162,4,'-'],['Kwasa Sentral',810,1262,5],['Kota Damansara',810,1335,6],['Surian',810,1395,7],
+  ['Mutiara Damansara',810,1452,8],['Bandar Utama',810,1528,9],['Taman Tun Dr Ismail',810,1603,10],['Phileo Damansara',810,1683,12],[810,1775],
+  ['Pusat Bandar Damansara',951,1775,13,'b'],['Semantan',1175,1775,14,'b'],['Muzium Negara',1317,1775,15,'t'],[1670,1775],
+  ['Pasar Seni',1670,1726,16,'r'],[1670,1620],['Merdeka',1897,1620,17,'b'],[1995,1620],[1995,1432],['Bukit Bintang',2030,1432,'18A','b'],
+  ['TRX|Tun Razak Exchange (TRX)',2310,1432,20,'-'],['Cochrane',2414,1432,21,'b'],['Maluri',2496,1432,22,'-'],[2592,1432],
+  ['Taman Pertama',2592,1478,23],['Taman Midah',2592,1563,24],['Taman Mutiara',2592,1655,25],['Taman Connaught',2592,1743,26],
+  ['Taman Suntex',2592,1813,27],['Sri Raya',2592,1878,28],['Bandar Tun Hussein Onn',2592,1938,29],['Batu 11 Cheras',2592,2011,30],
+  ['Bukit Dukung',2592,2086,31],['Sungai Jernih',2592,2153,33],['Stadium Kajang',2592,2222,34],[2592,2290],['Kajang',2418,2290,35,'-']]},
+ {id:'10',name:'KTM KL Sentral – Skypark Terminal',kind:'Airport rail',color:'#6C6A2C',ride:10,wait:30,cost:{'Skypark Terminal~Subang Jaya':10,'Subang Jaya~KL Sentral':20},pts:[
+  ['Skypark Terminal',375,1927,1,'b'],[438,1927],[438,2366],['Subang Jaya',658,2366,2,'-'],[1470,2366],[1470,2000],['KL Sentral',1450,1970,3,'-']]},
+ {id:'11',name:'LRT Shah Alam Line',kind:'LRT',color:'#1C9AD6',ride:2.5,wait:5,pts:[
+  ['Bandar Utama',781,1528,1,'-'],[600,1528],['Kayu Ara',600,1603,2],['BU 11',600,1683,3],['Damansara Idaman',600,1768,5],['Subang',600,1847,6],
+  ['Glenmarie 2',600,2241,7,'l'],[600,2278],['Kerjaya',489,2278,9,'b'],['Stadium Shah Alam',397,2278,10,'tl'],[355,2278],
+  ["Dato' Menteri",355,2308,12,'l'],['UiTM Shah Alam',355,2368,14,'l'],['Seksyen 7 Shah Alam',355,2440,15,'l'],['Bandar Baru Klang',355,2506,17,'l'],
+  ['Pasar Klang',355,2576,18,'l'],['Jalan Meru',355,2647,19,'l'],[355,2686],['Jambatan Kota',463,2686,20,'b'],[650,2686],
+  ['Taman Selatan',650,2752,21,'l'],['Seri Andalas',650,2828,22,'l'],['Klang Jaya',650,2889,23,'l'],['Bandar Bukit Tinggi',650,2955,24,'l'],
+  ['Johan Setia',650,3020,26,'r']]},
+ {id:'12',name:'MRT Putrajaya Line',kind:'MRT',color:'#F2C318',dark:true,ride:2.2,wait:4,pts:[
+  ['Kwasa Damansara',810,1184,1,'r'],['Kampung Selamat',810,1095,3,'l'],['Sungai Buloh',810,1001,4,'-'],['Damansara Damai',810,852,5,'l'],
+  ['Sri Damansara Barat',810,770,6,'l'],[810,680],['Sri Damansara Sentral',921,680,7,'b'],['Sri Damansara Timur',1058,680,8,'b'],
+  ['Metro Prima',1191,680,9,'b'],['Kepong Baru',1275,680,10,'b'],['Jinjang',1362,680,11,'b'],[1422,680],['Sri Delima',1422,798,12,'l'],
+  ['Kampung Batu',1422,862,13,'-'],['Kentonmen',1422,942,14,'l'],['Jalan Ipoh',1422,1005,15,'l'],['Sentul Barat',1422,1048,16,'l'],[1422,1088],
+  ['Titiwangsa',1635,1088,17,'-'],['Hospital Kuala Lumpur',1913,1088,18,'t'],['Raja Uda',2002,1088,19,'t'],['Ampang Park',2080,1088,20,'-'],[2310,1088],
+  ['Persiaran KLCC',2310,1198,21],['Conlay',2310,1293,22],['TRX|Tun Razak Exchange (TRX)',2310,1410,23,'tl'],['Chan Sow Lin',2310,1572,24,'r'],
+  [2310,1640],[1880,2040],['Kuchai',1872,2077,27,'l'],[1880,2110],['Taman Naga Emas',1944,2167,28,'l'],['Sungai Besi',1990,2212,29,'tr'],[2095,2310],
+  ['Serdang Raya Utara',2095,2397,31,'l'],['Serdang Raya Selatan',2095,2453,32,'l'],['Serdang Jaya',2095,2509,33,'l'],['UPM',2095,2564,34,'l'],
+  ['Taman Equine',2095,2622,36,'l'],['Putra Permai',2095,2677,37,'l'],['16 Sierra',2095,2734,38,'l'],['Cyberjaya Utara',2095,2790,39,'l'],
+  ['Cyberjaya City Centre',2095,2846,40,'l'],[2095,2883],['Putrajaya Sentral',2133,2883,41,'-']]},
+ {id:'B1',name:'BRT Sunway Line',kind:'Bus rapid transit',color:'#1D4634',ride:3,wait:5,pts:[
+  ['Setia Jaya',873,2475,1,'-'],[873,2525],['Mentari',966,2525,2,'b'],['Sunway Lagoon',1087,2525,3,'b'],[1178,2525],['SunMed',1178,2613,4,'r'],
+  [1178,2697],['SunU-Monash',1129,2697,5,'b'],['South Quay-USJ 1',935,2697,6,'b'],['USJ 7',726,2697,7,'-']]},
+];
+/* Separate stations joined by a walkway on the map (grey links). */
+const WALKS = [['Kepong Sentral','Sri Damansara Timur'],['Putra','PWTC'],['Bank Negara','Bandaraya'],['Kuala Lumpur','Pasar Seni'],
+  ['Muzium Negara','KL Sentral'],['Sultan Ismail','Medan Tuanku'],['Dang Wangi','Bukit Nanas'],['Plaza Rakyat','Merdeka'],['Glenmarie','Glenmarie 2']];
+const HUB = {id:'KL Sentral',x:1418,y:1795,w:64,h:200};
+const FULL = {x:170,y:500,w:2660,h:2700};
+const EXAMPLE = ['Bandar Utama','KLCC'];
+
+/* ---------- Build model ---------- */
+const STN = new Map();           // id -> {id,name,occ:[{li,si}]}
+LINES.forEach((L,li)=>{
+  L.stops=[]; L.poly=[]; L.idx=new Map();
+  L.pts.forEach(p=>{
+    if(typeof p[0]==='number'){ L.poly.push([p[0],p[1]]); return; }
+    let [raw,x,y,code,side]=p; let id=raw,name=raw;
+    if(raw.includes('|')){ [id,name]=raw.split('|'); }
+    const si=L.stops.length;
+    L.stops.push({id,name,x,y,code,side:side||'r',pi:L.poly.length});
+    L.poly.push([x,y]); L.idx.set(id,si);
+    if(!STN.has(id)) STN.set(id,{id,name,occ:[]});
+    STN.get(id).occ.push({li,si});
+  });
+});
+const WALKMAP = new Map();
+WALKS.forEach(([a,b])=>{ [[a,b],[b,a]].forEach(([p,q])=>{ if(!WALKMAP.has(p)) WALKMAP.set(p,[]); WALKMAP.get(p).push(q); }); });
+const isX = id => STN.get(id).occ.length>1 || WALKMAP.has(id);
+const pos = (li,si)=>{ const s=LINES[li].stops[si]; return [s.x,s.y]; };
+
+/* ---------- SVG helpers ---------- */
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs,parent){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); if(parent) parent.appendChild(e); return e; }
+function roundedPath(pts,R=38){
+  const P=pts.filter((p,i)=>i===0||Math.hypot(p[0]-pts[i-1][0],p[1]-pts[i-1][1])>0.5);
+  if(P.length<2) return `M${P[0][0]},${P[0][1]}`;
+  let d=`M${P[0][0]},${P[0][1]}`;
+  for(let i=1;i<P.length-1;i++){
+    const [ax,ay]=P[i-1],[bx,by]=P[i],[cx,cy]=P[i+1];
+    const v1=[bx-ax,by-ay],v2=[cx-bx,cy-by],l1=Math.hypot(...v1),l2=Math.hypot(...v2);
+    const cross=Math.abs(v1[0]*v2[1]-v1[1]*v2[0])/(l1*l2);
+    if(cross<0.02){ d+=` L${bx},${by}`; continue; }
+    const r=Math.min(R,l1/2,l2/2);
+    const p1=[bx-v1[0]/l1*r,by-v1[1]/l1*r],p2=[bx+v2[0]/l2*r,by+v2[1]/l2*r];
+    d+=` L${p1[0].toFixed(1)},${p1[1].toFixed(1)} Q${bx},${by} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  const z=P[P.length-1]; return d+` L${z[0]},${z[1]}`;
+}
+function wrapName(n){
+  if(n.length<=10||!n.includes(' ')) return [n];
+  let best=-1,bd=1e9; for(let i=0;i<n.length;i++) if(n[i]===' '&&Math.abs(i-n.length/2)<bd){bd=Math.abs(i-n.length/2);best=i;}
+  return [n.slice(0,best),n.slice(best+1)];
+}
+function makeLabel(s,side,parent,bold){
+  const g=el('g',{},parent);
+  const multi=['t','b','tr','tl','br','bl'].includes(side);
+  const lines=multi?wrapName(s.name):[s.name];
+  const LH=19; let x=s.x,y=s.y,anchor='start',ys=[];
+  const n=lines.length;
+  switch(side){
+    case 'l': x-=15; anchor='end'; ys=[y+6]; break;
+    case 'R': x+=60; ys=[y+6]; break;
+    case 't': anchor='middle'; ys=lines.map((_,k)=>y-17-(n-1-k)*LH); break;
+    case 'b': anchor='middle'; ys=lines.map((_,k)=>y+30+k*LH); break;
+    case 'tr': x+=10; ys=lines.map((_,k)=>y-15-(n-1-k)*LH); break;
+    case 'tl': x-=10; anchor='end'; ys=lines.map((_,k)=>y-15-(n-1-k)*LH); break;
+    case 'br': x+=10; ys=lines.map((_,k)=>y+30+k*LH); break;
+    case 'bl': x-=10; anchor='end'; ys=lines.map((_,k)=>y+30+k*LH); break;
+    default: x+=15; ys=[y+6];
+  }
+  lines.forEach((t,k)=>{ const te=el('text',{x,y:ys[k],'text-anchor':anchor,class:'lbl'+(bold?' x':'')},g); te.textContent=t; });
+  return g;
+}
+// minimum spanning set of links between positions (for stacked interchange dots)
+function mstPairs(ps){
+  const out=[],inT=[0]; const rest=ps.map((_,i)=>i).slice(1);
+  while(rest.length){ let bi=-1,bj=-1,bd=1e9;
+    inT.forEach(i=>rest.forEach(j=>{const d=Math.hypot(ps[i][0]-ps[j][0],ps[i][1]-ps[j][1]); if(d<bd){bd=d;bi=i;bj=j;}}));
+    out.push([ps[bi],ps[bj]]); inT.push(bj); rest.splice(rest.indexOf(bj),1); }
+  return out;
+}
+function closestPair(A,B){ let best=null,bd=1e9; A.forEach(a=>B.forEach(b=>{const d=Math.hypot(a[0]-b[0],a[1]-b[1]); if(d<bd){bd=d;best=[a,b];}})); return best; }
+// interchange / walkway links: dotted line, faint on the base map, full strength on a highlighted route
+function connector(a,b,parent,w=1,strong=false){
+  el('line',{x1:a[0],y1:a[1],x2:b[0],y2:b[1],class:'conn-o','stroke-width':strong?6:5,'stroke-linecap':'round','stroke-dasharray':'0.1 11',opacity:strong?1:.2},parent);
+}
+function badgeHTML(L,lg){ return `<span class="badge${lg?' lg':''}" style="background:${L.color};color:${L.dark?'#1b1b1b':'#fff'}" title="${L.name}">${L.id}</span>`; }
+
+/* ---------- Draw base map ---------- */
+const svg=document.getElementById('map'), base=document.getElementById('base'), overlay=document.getElementById('overlay'), hits=document.getElementById('hits'), routeHits=document.getElementById('routeHits'), dragG=document.getElementById('drag');
+const LABELS=new Map();
+function drawBase(){
+  const gLines=el('g',{},base), gConn=el('g',{},base), gHub=el('g',{},base), gDots=el('g',{},base), gLbl=el('g',{},base), gBadge=el('g',{},base);
+  LINES.forEach(L=>{ L.d=roundedPath(L.poly); el('path',{d:L.d,fill:'none',stroke:L.color,'stroke-width':10,'stroke-linecap':'round','stroke-linejoin':'round'},gLines); });
+  // interchange links
+  STN.forEach(S=>{ if(S.occ.length>1){ const ps=S.occ.map(o=>pos(o.li,o.si)); mstPairs(ps).forEach(([a,b])=>{ if(Math.hypot(a[0]-b[0],a[1]-b[1])>3 && S.id!==HUB.id) connector(a,b,gConn); }); } });
+  WALKS.forEach(([a,b])=>{ const pr=closestPair(STN.get(a).occ.map(o=>pos(o.li,o.si)),STN.get(b).occ.map(o=>pos(o.li,o.si))); connector(pr[0],pr[1],gConn,.8); });
+  // KL Sentral: monorail link to hub
+  const mono=LINES[7].stops[0]; connector([HUB.x+HUB.w/2,mono.y],[mono.x,mono.y],gConn);
+  // dots
+  LINES.forEach((L,li)=>L.stops.forEach(s=>{
+    if(s.id===HUB.id && li!==7) return;
+    const x=isX(s.id);
+    el('circle',{cx:s.x,cy:s.y,r:x?9:7.5,class:'stn',stroke:x?'var(--ink)':L.color,'stroke-width':x?3.2:3.5},gDots);
+  }));
+  // hub pill
+  el('rect',{x:HUB.x,y:HUB.y,width:HUB.w,height:HUB.h,rx:HUB.w/2,fill:'var(--hub)',stroke:'var(--dot)','stroke-width':3},gHub);
+  LINES.forEach((L,li)=>{ if(li===7) return; const i=L.idx.get(HUB.id); if(i==null) return; const s=L.stops[i];
+    el('circle',{cx:HUB.x+HUB.w/2,cy:s.y,r:10,fill:L.color,stroke:'#fff','stroke-width':2.5},gHub); });
+  // labels
+  LINES.forEach(L=>L.stops.forEach(s=>{ if(s.side==='-'||LABELS.has(s.id)) return; LABELS.set(s.id,makeLabel(s,s.side,gLbl,isX(s.id))); }));
+  const hubLbl=el('g',{},gLbl); const ht=el('text',{x:HUB.x-14,y:HUB.y+HUB.h/2+8,'text-anchor':'end',class:'lbl hub'},hubLbl); ht.textContent='KL Sentral'; LABELS.set(HUB.id,hubLbl);
+  STN.forEach(S=>{ if(!LABELS.has(S.id)){ const o=S.occ[0]; LABELS.set(S.id,makeLabel(LINES[o.li].stops[o.si],'r',gLbl,isX(S.id))); } });
+  // terminus badges on single-line termini
+  LINES.forEach(L=>{ [[0,1],[L.poly.length-1,L.poly.length-2]].forEach(([e,p])=>{
+    const s=L.stops.find(st=>st.pi===e); if(!s||STN.get(s.id).occ.length>1) return;
+    const [ex,ey]=L.poly[e],[px,py]=L.poly[p]; const l=Math.hypot(ex-px,ey-py); const bx=ex+(ex-px)/l*36, by=ey+(ey-py)/l*36;
+    el('circle',{cx:bx,cy:by,r:17,fill:L.color},gBadge);
+    const t=el('text',{x:bx,y:by+6.5,'text-anchor':'middle','font-family':'Barlow Semi Condensed, sans-serif','font-weight':700,'font-size':L.id.length>1?16:19,fill:L.dark?'#1b1b1b':'#fff'},gBadge); t.textContent=L.id;
+  }); });
+  // hit targets
+  STN.forEach(S=>{ S.occ.forEach(o=>{ const s=LINES[o.li].stops[o.si]; let cx=s.x;
+    if(S.id===HUB.id && o.li!==7) cx=HUB.x+HUB.w/2;
+    const c=el('circle',{cx,cy:s.y,r:20,class:'hit','data-sid':S.id},hits); el('title',{},c).textContent=S.name; }); });
+}
+
+/* ---------- Routing ---------- */
+function edgeCost(L,a,b){ if(L.cost){ const k1=a+'~'+b,k2=b+'~'+a; if(L.cost[k1]!=null) return L.cost[k1]; if(L.cost[k2]!=null) return L.cost[k2]; } return L.ride; }
+function route(from,to,opt={}){
+  const ban=opt.banLines||new Set(), banX=opt.banTransfer||new Set();
+  const dist=new Map(), prev=new Map(), open=[];
+  const key=(sid,li)=>sid+'|'+li;
+  const push=(sid,li,c,p)=>{ const k=key(sid,li); if(c<(dist.get(k)??Infinity)){ dist.set(k,c); prev.set(k,p); open.push([c,sid,li]); } };
+  STN.get(from).occ.forEach(o=>{ if(!ban.has(o.li)) push(from,o.li,LINES[o.li].wait/2,null); });
+  const done=new Set(); let goal=null;
+  while(open.length){
+    let bi=0; for(let i=1;i<open.length;i++) if(open[i][0]<open[bi][0]) bi=i;
+    const [c,sid,li]=open.splice(bi,1)[0]; const k=key(sid,li);
+    if(done.has(k)) continue; done.add(k);
+    if(sid===to){ goal=k; break; }
+    const L=LINES[li], si=L.idx.get(sid);
+    [si-1,si+1].forEach(nj=>{ if(nj<0||nj>=L.stops.length) return; const n=L.stops[nj]; push(n.id,li,c+edgeCost(L,sid,n.id),{k,type:'ride',li,from:si,to:nj}); });
+    if(!banX.has(sid)){
+      STN.get(sid).occ.forEach(o=>{ if(o.li!==li&&!ban.has(o.li)) push(sid,o.li,c+3+LINES[o.li].wait/2,{k,type:'change',at:sid,fromLi:li}); });
+      (WALKMAP.get(sid)||[]).forEach(w=>{ if(banX.has(w)) return; STN.get(w).occ.forEach(o=>{ if(!ban.has(o.li)) push(w,o.li,c+6+LINES[o.li].wait/2,{k,type:'walk',from:sid,to:w,fromLi:li}); }); });
+    }
+  }
+  if(!goal) return null;
+  // rebuild events
+  const ev=[]; let k=goal; while(prev.get(k)){ const p=prev.get(k); ev.unshift(p); k=p.k; }
+  const legs=[],links=[]; let cur=null, pendingLink=null;
+  ev.forEach(e=>{
+    if(e.type==='ride'){
+      if(cur&&cur.li===e.li){ cur.to=e.to; }
+      else { if(cur) legs.push(cur); cur={li:e.li,from:e.from,to:e.to,linkBefore:pendingLink}; pendingLink=null; }
+    } else if(e.type==='walk'){ pendingLink={type:'walk',from:e.from,to:e.to}; }
+    else if(e.type==='change'){ if(!pendingLink) pendingLink={type:'change',at:e.at}; }
+  });
+  if(cur) legs.push(cur);
+  if(!legs.length) return null; // stations joined only by a walkway
+  return summarize({from,to,legs,tail:pendingLink,cost:dist.get(goal),points:[from,to]});
+}
+function summarize(r){
+  const {legs,tail}=r; let mins=0;
+  legs.forEach((g,i)=>{ const L=LINES[g.li]; const step=g.from<g.to?1:-1;
+    mins+= i===0?L.wait/2:(3+L.wait/2);
+    for(let j=g.from;j!==g.to;j+=step) mins+=edgeCost(L,L.stops[j].id,L.stops[j+step].id);
+    if(g.linkBefore&&g.linkBefore.type==='walk') mins+=i===0?6:3; });
+  if(tail&&tail.type==='walk') mins+=6;
+  r.mins=Math.round(mins); r.stops=legs.reduce((a,g)=>a+Math.abs(g.to-g.from),0);
+  r.changes=Math.max(0,legs.length-1); r.sig=legs.map(g=>LINES[g.li].id).join('>');
+  return r;
+}
+// Route that passes through the given stations in order: [from, via1, via2, ..., to]
+function routeVia(points){
+  let legs=[],tail=null,cost=0;
+  for(let k=0;k<points.length-1;k++){
+    const r=route(points[k],points[k+1]); if(!r) return null;
+    cost+=r.cost;
+    r.legs.forEach((g,i)=>{ g={...g};
+      if(i===0&&!g.linkBefore&&tail) g.linkBefore=tail;
+      const p=legs[legs.length-1];
+      const dir=x=>Math.sign(x.to-x.from);
+      if(i===0&&p&&p.li===g.li&&!g.linkBefore&&p.to===g.from&&dir(p)===dir(g)){ p.to=g.to; return; } // ride straight through the via
+      legs.push(g); });
+    tail=r.tail;
+  }
+  return summarize({from:points[0],to:points[points.length-1],legs,tail,cost,points:points.slice()});
+}
+function findRoutes(from,to){
+  const best=route(from,to); if(!best) return [];
+  const cands=[];
+  const usedLines=[...new Set(best.legs.map(g=>g.li))];
+  usedLines.forEach(li=>{ const r=route(from,to,{banLines:new Set([li])}); if(r) cands.push(r); });
+  const xs=[]; best.legs.forEach((g,i)=>{ if(i>0){ xs.push(LINES[g.li].stops[g.from].id); const lb=g.linkBefore; if(lb&&lb.type==='walk') xs.push(lb.from); } });
+  xs.forEach(x=>{ if(x===from||x===to) return; const r=route(from,to,{banTransfer:new Set([x])}); if(r) cands.push(r); });
+  if(usedLines.length>1) for(let i=0;i<usedLines.length;i++) for(let j=i+1;j<usedLines.length;j++){ const r=route(from,to,{banLines:new Set([usedLines[i],usedLines[j]])}); if(r) cands.push(r); }
+  const seen=new Set([best.sig]), alts=[];
+  cands.sort((a,b)=>a.cost-b.cost).forEach(r=>{ if(seen.has(r.sig)) return; if(r.cost>best.cost*1.7+15) return; seen.add(r.sig); alts.push(r); });
+  return [best,...alts.slice(0,2)];
+}
+
+/* ---------- Route overlay ---------- */
+function legPts(g){ const L=LINES[g.li]; const a=L.stops[g.from].pi,b=L.stops[g.to].pi;
+  return a<=b?L.poly.slice(a,b+1):L.poly.slice(b,a+1).reverse(); }
+function stopPos(li,si){ const s=LINES[li].stops[si]; if(s.id===HUB.id&&li!==7) return [HUB.x+HUB.w/2,s.y]; return [s.x,s.y]; }
+function occPos(id){ return STN.get(id).occ.map(o=>stopPos(o.li,o.si)); }
+function clearOverlay(){ overlay.replaceChildren(); routeHits.replaceChildren(); base.classList.remove('dim'); }
+function drawRoute(r){
+  overlay.replaceChildren(); routeHits.replaceChildren(); base.classList.add('dim');
+  const gCase=el('g',{},overlay), gLine=el('g',{},overlay), gConn=el('g',{},overlay), gHub=el('g',{},overlay), gDot=el('g',{},overlay), gLbl=el('g',{},overlay), gPin=el('g',{},overlay);
+  const ids=new Set(); let usesHub=false;
+  r.legs.forEach((g,i)=>{
+    const L=LINES[g.li], d=roundedPath(legPts(g));
+    el('path',{d,fill:'none',stroke:'var(--dot)','stroke-width':20,'stroke-linecap':'round','stroke-linejoin':'round'},gCase);
+    el('path',{d,fill:'none',stroke:L.color,'stroke-width':12,'stroke-linecap':'round','stroke-linejoin':'round'},gLine);
+    el('path',{d,class:'route-hit'},routeHits);
+    if(g.linkBefore&&g.linkBefore.type==='walk') ids.add(g.linkBefore.from);
+    const step=g.from<g.to?1:-1;
+    for(let j=g.from;;j+=step){ const s=L.stops[j]; ids.add(s.id);
+      if(s.id===HUB.id&&g.li!==7) usesHub=true;
+      else el('circle',{cx:s.x,cy:s.y,r:isX(s.id)?9:7.5,class:'stn',stroke:isX(s.id)?'var(--ink)':L.color,'stroke-width':isX(s.id)?3.2:3.5},gDot);
+      if(j===g.to) break; }
+    // connect to previous leg so the highlighted path is continuous
+    if(i>0){ const pg=r.legs[i-1]; const a=stopPos(pg.li,pg.to), b=stopPos(g.li,g.from);
+      if(Math.hypot(a[0]-b[0],a[1]-b[1])>2) connector(a,b,gConn,1,true); }
+    else if(g.linkBefore&&g.linkBefore.type==='walk'){ const pr=closestPair(occPos(g.linkBefore.from),[stopPos(g.li,g.from)]); connector(pr[0],pr[1],gConn,1,true); ids.add(g.linkBefore.from); }
+  });
+  if(r.tail&&r.tail.type==='walk'){ const lg=r.legs[r.legs.length-1]; const pr=closestPair([stopPos(lg.li,lg.to)],occPos(r.tail.to)); connector(pr[0],pr[1],gConn,1,true); ids.add(r.tail.to); }
+  if(usesHub){ el('rect',{x:HUB.x,y:HUB.y,width:HUB.w,height:HUB.h,rx:HUB.w/2,fill:'var(--hub)',stroke:'var(--dot)','stroke-width':3},gHub);
+    r.legs.forEach(g=>{ if(g.li===7) return; const i=LINES[g.li].idx.get(HUB.id); if(i==null) return; if(g.from!==i&&g.to!==i&&!(Math.min(g.from,g.to)<i&&i<Math.max(g.from,g.to))) return;
+      el('circle',{cx:HUB.x+HUB.w/2,cy:LINES[g.li].stops[i].y,r:10,fill:LINES[g.li].color,stroke:'#fff','stroke-width':2.5},gHub); }); }
+  ids.forEach(id=>{ const lb=LABELS.get(id); if(lb){ const c=lb.cloneNode(true); gLbl.appendChild(c); } });
+  // A / B markers
+  const fl=r.legs[0], ll=r.legs[r.legs.length-1];
+  let A=r.legs[0].linkBefore&&r.legs[0].linkBefore.type==='walk'?closestPair(occPos(r.from),[stopPos(fl.li,fl.from)])[0]:stopPos(fl.li,fl.from);
+  let B=r.tail&&r.tail.type==='walk'?closestPair([stopPos(ll.li,ll.to)],occPos(r.to))[1]:stopPos(ll.li,ll.to);
+  [[A,'A'],[B,'B']].forEach(([p,t])=>{ el('circle',{cx:p[0],cy:p[1],r:17,class:'pin-m',stroke:'var(--dot)','stroke-width':3},gPin); const tx=el('text',{x:p[0],y:p[1]+5.5,'text-anchor':'middle',class:'pin-t'},gPin); tx.textContent=t; });
+  // via markers (draggable)
+  (r.points||[]).slice(1,-1).forEach((id,j)=>{
+    let p=null; r.legs.forEach(g=>{ const L=LINES[g.li], lo=Math.min(g.from,g.to), hi=Math.max(g.from,g.to);
+      for(let q=lo;q<=hi;q++) if(!p&&L.stops[q].id===id) p=stopPos(g.li,q); });
+    if(!p){ // via reached only by a walkway: join it to the route so the path stays connected
+      const onRoute=[]; r.legs.forEach(g=>{ const lo=Math.min(g.from,g.to),hi=Math.max(g.from,g.to); for(let q=lo;q<=hi;q++) onRoute.push(stopPos(g.li,q)); });
+      const pr=closestPair(onRoute,occPos(id)); connector(pr[0],pr[1],gConn,1,true); p=pr[1];
+      const lb=LABELS.get(id); if(lb) gLbl.appendChild(lb.cloneNode(true)); }
+    const m=el('g',{class:'via-m','data-via':j},routeHits);
+    el('circle',{cx:p[0],cy:p[1],r:15,fill:'var(--dot)',stroke:'var(--ink)','stroke-width':4},m);
+    el('circle',{cx:p[0],cy:p[1],r:5,fill:'var(--ink)'},m);
+    el('title',{},m).textContent=`Via ${STN.get(id).name}. Drag to another station to move it.`;
+  });
+  // bbox
+  const all=[]; r.legs.forEach(g=>all.push(...legPts(g))); ids.forEach(id=>all.push(...occPos(id)));
+  return bbox(all,140);
+}
+function drawLineFocus(li){
+  overlay.replaceChildren(); routeHits.replaceChildren(); base.classList.add('dim');
+  const L=LINES[li]; const g=el('g',{},overlay);
+  el('path',{d:L.d,fill:'none',stroke:'var(--dot)','stroke-width':20,'stroke-linecap':'round','stroke-linejoin':'round'},g);
+  el('path',{d:L.d,fill:'none',stroke:L.color,'stroke-width':12,'stroke-linecap':'round','stroke-linejoin':'round'},g);
+  const gl=el('g',{},overlay);
+  L.stops.forEach(s=>{ if(s.id===HUB.id&&li!==7){ el('circle',{cx:HUB.x+HUB.w/2,cy:s.y,r:11,fill:L.color,stroke:'var(--ink)','stroke-width':3},g); }
+    else el('circle',{cx:s.x,cy:s.y,r:isX(s.id)?9:7.5,class:'stn',stroke:isX(s.id)?'var(--ink)':L.color,'stroke-width':3.4},g);
+    const lb=LABELS.get(s.id); if(lb) gl.appendChild(lb.cloneNode(true)); });
+  return bbox(L.poly,160);
+}
+function bbox(pts,pad){ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; pts.forEach(([x,y])=>{x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);});
+  return {x:x0-pad,y:y0-pad,w:(x1-x0)+pad*2,h:(y1-y0)+pad*2}; }
+
+/* ---------- Pan & zoom ---------- */
+let vb={...FULL};
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function applyVB(){ svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.w} ${vb.h}`); }
+function clampVB(){ const minW=260,maxW=FULL.w*1.6; const k=vb.w<minW?minW/vb.w:vb.w>maxW?maxW/vb.w:1;
+  if(k!==1){ const cx=vb.x+vb.w/2,cy=vb.y+vb.h/2; vb.w*=k; vb.h*=k; vb.x=cx-vb.w/2; vb.y=cy-vb.h/2; } }
+let anim=0;
+function animateTo(t){ cancelAnimationFrame(anim); const s={...vb};
+  const b={...t}; if(b.w<520){ const cx=b.x+b.w/2; b.w=520; b.x=cx-260; } if(b.h<520){ const cy=b.y+b.h/2; b.h=520; b.y=cy-260; }
+  if(reduce){ vb=b; applyVB(); return; }
+  const t0=performance.now(), D=450;
+  const f=now=>{ const p=Math.min(1,(now-t0)/D), e=1-Math.pow(1-p,3);
+    vb={x:s.x+(b.x-s.x)*e,y:s.y+(b.y-s.y)*e,w:s.w+(b.w-s.w)*e,h:s.h+(b.h-s.h)*e}; applyVB(); if(p<1) anim=requestAnimationFrame(f); };
+  anim=requestAnimationFrame(f); }
+function toSvg(cx,cy){ const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
+function zoomAt(cx,cy,k){ cancelAnimationFrame(anim); const p=toSvg(cx,cy); vb.x=p.x-(p.x-vb.x)*k; vb.y=p.y-(p.y-vb.y)*k; vb.w*=k; vb.h*=k; clampVB(); applyVB(); }
+svg.addEventListener('wheel',e=>{ e.preventDefault(); zoomAt(e.clientX,e.clientY,Math.exp(e.deltaY*(e.ctrlKey?0.01:0.0015))); },{passive:false});
+const ptrs=new Map(); let moved=0, pinch=null;
+svg.addEventListener('pointerdown',e=>{ svg.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); moved=0; cancelAnimationFrame(anim);
+  if(ptrs.size===2){ const [a,b]=[...ptrs.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y),mx:(a.x+b.x)/2,my:(a.y+b.y)/2}; } else svg.classList.add('dragging'); });
+svg.addEventListener('pointermove',e=>{ if(!ptrs.has(e.pointerId)) return; const p=ptrs.get(e.pointerId); const dx=e.clientX-p.x, dy=e.clientY-p.y;
+  p.x=e.clientX; p.y=e.clientY; moved+=Math.abs(dx)+Math.abs(dy);
+  if(ptrs.size===2&&pinch){ const [a,b]=[...ptrs.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y), mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    const s=svg.getScreenCTM().a; vb.x-=(mx-pinch.mx)/s; vb.y-=(my-pinch.my)/s; applyVB(); zoomAt(mx,my,pinch.d/d); pinch={d,mx,my}; return; }
+  if(ptrs.size===1){ const s=svg.getScreenCTM().a; vb.x-=dx/s; vb.y-=dy/s; applyVB(); } });
+const endPtr=e=>{ ptrs.delete(e.pointerId); if(ptrs.size<2) pinch=null; if(!ptrs.size) svg.classList.remove('dragging'); };
+svg.addEventListener('pointerup',endPtr); svg.addEventListener('pointercancel',endPtr);
+const zc=()=>{ const r=svg.getBoundingClientRect(); return [r.left+r.width/2,r.top+r.height/2]; };
+document.getElementById('zin').onclick=()=>{ const [x,y]=zc(); zoomAt(x,y,1/1.4); };
+document.getElementById('zout').onclick=()=>{ const [x,y]=zc(); zoomAt(x,y,1.4); };
+document.getElementById('zfit').onclick=()=>animateTo(currentFocus||FULL);
+
+/* ---------- Search UI ---------- */
+const ALL=[...STN.values()].sort((a,b)=>a.name.localeCompare(b.name));
+const norm=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const linesOf=id=>[...new Set(STN.get(id).occ.map(o=>o.li).concat((WALKMAP.get(id)||[]).length?[]:[]))];
+function esc(s){ return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function matches(q){ const n=norm(q); if(!n) return ALL.slice();
+  const out=[]; ALL.forEach(S=>{ const nn=norm(S.name); const i=nn.indexOf(n); if(i<0) return; const wordStart=i===0||nn[i-1]===' ';
+    out.push({S,score:(i===0?0:wordStart?1:2)}); });
+  return out.sort((a,b)=>a.score-b.score||a.S.name.localeCompare(b.S.name)).map(o=>o.S); }
+function hl(name,q){ const n=norm(q); if(!n) return esc(name);
+  const low=name.toLowerCase(); const i=low.indexOf(q.toLowerCase().trim()); if(i<0) return esc(name);
+  const L=q.trim().length; return esc(name.slice(0,i))+'<mark>'+esc(name.slice(i,i+L))+'</mark>'+esc(name.slice(i+L)); }
+function setupField(input,list){
+  let items=[],active=-1;
+  const close=()=>{ list.hidden=true; input.setAttribute('aria-expanded','false'); active=-1; };
+  const render=()=>{ items=matches(input.value).slice(0,40);
+    list.innerHTML=items.length?items.map((S,i)=>`<li role="option" id="${list.id}-${i}" data-i="${i}" aria-selected="${i===active}"><span>${hl(S.name,input.value)}</span><span class="badges">${linesOf(S.id).map(li=>badgeHTML(LINES[li])).join('')}</span></li>`).join('')
+      :'<li class="empty">No station matches that name</li>';
+    list.hidden=false; input.setAttribute('aria-expanded','true');
+    if(active>=0){ input.setAttribute('aria-activedescendant',`${list.id}-${active}`); const a=list.querySelector(`[data-i="${active}"]`); a&&a.scrollIntoView({block:'nearest'}); } else input.removeAttribute('aria-activedescendant'); };
+  const choose=i=>{ const S=items[i]; if(!S) return; input.value=S.name; input.dataset.sid=S.id; close(); msg(''); };
+  input.addEventListener('input',()=>{ delete input.dataset.sid; active=items.length?0:-1; active=0; render(); if(!items.length) active=-1; });
+  input.addEventListener('focus',()=>{ active=-1; render(); });
+  input.addEventListener('blur',()=>setTimeout(close,150));
+  input.addEventListener('keydown',e=>{
+    if(e.key==='ArrowDown'){ e.preventDefault(); if(list.hidden) render(); active=Math.min(items.length-1,active+1); render(); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); active=Math.max(0,active-1); render(); }
+    else if(e.key==='Enter'){ if(!list.hidden&&active>=0&&items[active]){ e.preventDefault(); choose(active); if(input.id==='fromInput') toInput.focus(); else search(); } }
+    else if(e.key==='Escape'){ close(); } });
+  list.addEventListener('mousedown',e=>{ const li=e.target.closest('li[data-i]'); if(li){ e.preventDefault(); choose(+li.dataset.i); if(input.id==='fromInput'&&!toInput.dataset.sid) toInput.focus(); else if(fromInput.dataset.sid&&toInput.dataset.sid) search(); } });
+}
+const fromInput=document.getElementById('fromInput'), toInput=document.getElementById('toInput');
+setupField(fromInput,document.getElementById('fromList'));
+setupField(toInput,document.getElementById('toList'));
+function resolve(input){ if(input.dataset.sid&&STN.has(input.dataset.sid)) return input.dataset.sid; const v=norm(input.value); if(!v) return null;
+  const exact=ALL.filter(S=>norm(S.name)===v); if(exact.length) return exact[0].id; const m=matches(input.value); return m.length===1?m[0].id:null; }
+function setField(input,id){ input.value=STN.get(id).name; input.dataset.sid=id; }
+const msgEl=document.getElementById('msg'); function msg(t){ msgEl.textContent=t; }
+
+document.querySelectorAll('[data-clear]').forEach(b=>b.onclick=()=>{ const i=document.getElementById(b.dataset.clear); i.value=''; delete i.dataset.sid; i.focus(); });
+document.getElementById('swapBtn').onclick=()=>{ const a=[fromInput.value,fromInput.dataset.sid],b=[toInput.value,toInput.dataset.sid];
+  fromInput.value=b[0]; toInput.value=a[0]; b[1]?fromInput.dataset.sid=b[1]:delete fromInput.dataset.sid; a[1]?toInput.dataset.sid=a[1]:delete toInput.dataset.sid;
+  if(fromInput.dataset.sid&&toInput.dataset.sid) search(); };
+document.getElementById('tripForm').addEventListener('submit',e=>{ e.preventDefault(); search(); });
+document.getElementById('resetBtn').onclick=()=>{ [fromInput,toInput].forEach(i=>{ i.value=''; delete i.dataset.sid; }); msg(''); resultsEl.hidden=true; setLegend(null); clearOverlay(); currentFocus=null; animateTo(FULL); hint('Drag to pan, scroll or pinch to zoom'); };
+
+/* ---------- Results ---------- */
+const resultsEl=document.getElementById('results');
+let routes=[], baseRoutes=[], sel=0, currentFocus=null;
+let stepsOpen=null; // until the user toggles it: open on desktop, collapsed on phones so the map stays close
+function search(){
+  const a=resolve(fromInput), b=resolve(toInput);
+  if(!a){ msg(fromInput.value?`"${fromInput.value}" is not a station on this map. Pick one from the suggestions.`:'Enter a starting station.'); fromInput.focus(); return; }
+  if(!b){ msg(toInput.value?`"${toInput.value}" is not a station on this map. Pick one from the suggestions.`:'Enter a destination station.'); toInput.focus(); return; }
+  setField(fromInput,a); setField(toInput,b);
+  if(a===b){ msg('Origin and destination are the same station. Choose a different destination.'); return; }
+  msg(''); setLegend(null);
+  baseRoutes=findRoutes(a,b); routes=baseRoutes.slice();
+  if(!routes.length){ msg((WALKMAP.get(a)||[]).includes(b)?'These two stations are joined by a walkway, so you can walk between them.':'No rail connection was found between these stations.'); resultsEl.hidden=true; clearOverlay(); return; }
+  sel=0; renderResults(); showRoute(0,true);
+}
+function showRoute(i,fit){ sel=i; const box=drawRoute(routes[i]); currentFocus=box; if(fit) animateTo(box);
+  resultsEl.querySelectorAll('.tab').forEach((t,k)=>t.setAttribute('aria-selected',k===i)); renderSteps(); hint(routes[i].custom?'Showing your route. Drag the route or a via point to change it.':`Showing ${i===0?'fastest route':'alternative '+i}. Drag the route to change it.`); }
+function renderResults(){
+  const tabs=routes.map((r,i)=>`<button class="tab" role="tab" aria-selected="${i===sel}" data-i="${i}"><span class="t-kind">${r.custom?'Your route':i===0?'Fastest':'Alternative'+(baseRoutes.length>2?' '+i:'')}</span><span class="t-time">≈ ${r.mins} min</span><span class="t-lines">${r.legs.map(g=>badgeHTML(LINES[g.li])).join('')}</span></button>`).join('');
+  resultsEl.innerHTML=`<h2>Routes</h2><div class="tabs" role="tablist">${tabs}</div>${baseRoutes.length===1?'<p class="note">No alternative line combination is available for this trip.</p>':''}<p class="tip"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg><span>Prefer another way? Drag the highlighted route onto any station to travel through it.</span></p><div id="detail"></div>`;
+  resultsEl.hidden=false;
+  resultsEl.querySelectorAll('.tab').forEach(t=>t.onclick=()=>showRoute(+t.dataset.i,true));
+}
+function renderSteps(){
+  const r=routes[sel]; const d=resultsEl.querySelector('#detail'); const nm=id=>esc(STN.get(id).name);
+  let h=`<div class="summary"><span><b>≈ ${r.mins}</b> min</span><span><b>${r.stops}</b> stops</span><span><b>${r.changes}</b> ${r.changes===1?'change':'changes'}</span></div>`;
+  const vias=(r.points||[]).slice(1,-1);
+  if(r.custom) h+=`<div class="vias"><span class="lbl-t">Via</span>${vias.map((id,j)=>`<span class="chip">${nm(id)}<button type="button" data-rmvia="${j}" aria-label="Remove ${nm(id)}">×</button></span>`).join('')}<button type="button" class="linkbtn" id="discardCustom">Discard my route</button></div>`;
+  h+=`<details class="stepwrap"${(stepsOpen??!matchMedia('(max-width:820px)').matches)?' open':''}><summary>Step-by-step directions</summary><ol class="steps">`;
+  const viaSet=new Set(vias.map(id=>STN.get(id).name));
+  const lg0=r.legs[0];
+  if(lg0.linkBefore&&lg0.linkBefore.type==='walk'){
+    h+=`<li class="step"><div class="gut"><span class="node"></span><span class="bar walk"></span></div><div class="body"><div class="st">${nm(r.from)}</div><div class="sub">Walk via the linked walkway</div></div></li>`; }
+  r.legs.forEach((g,i)=>{ const L=LINES[g.li]; const s=L.stops[g.from], e=L.stops[g.to]; const toward=g.to>g.from?L.stops[L.stops.length-1].name:L.stops[0].name;
+    const n=Math.abs(g.to-g.from); const step=g.from<g.to?1:-1; const mid=[]; for(let j=g.from+step;j!==g.to;j+=step) mid.push(L.stops[j].name+(viaSet.has(L.stops[j].name)?' (via)':''));
+    let lead='';
+    if(i===0) lead=lg0.linkBefore&&lg0.linkBefore.type==='walk'?'Board here':'Start';
+    else { const lb=g.linkBefore; lead=lb&&lb.type==='walk'?`Walk from ${nm(lb.from)} to this station, then board`:r.legs[i-1].li===g.li?'Stay on this line and ride back the other way':'Change here'; }
+    h+=`<li class="step"><div class="gut"><span class="node"></span><span class="bar" style="background:${L.color}"></span></div><div class="body">
+      <div class="st">${esc(s.name)}</div><div class="sub">${lead}</div>
+      <div class="leg">${badgeHTML(L,true)}<span>${esc(L.name)}</span></div>
+      <div class="sub">Toward ${esc(toward)} · ${n} ${n===1?'stop':'stops'}</div>
+      ${mid.length?`<details><summary>${mid.length} intermediate ${mid.length===1?'station':'stations'}</summary><ol>${mid.map(m=>`<li>${esc(m)}</li>`).join('')}</ol></details>`:''}
+    </div></li>`;
+  });
+  const last=r.legs[r.legs.length-1], lastStop=LINES[last.li].stops[last.to];
+  if(r.tail&&r.tail.type==='walk'){
+    h+=`<li class="step"><div class="gut"><span class="node"></span><span class="bar walk"></span></div><div class="body"><div class="st">${esc(lastStop.name)}</div><div class="sub">Alight and walk via the linked walkway</div></div></li>`; }
+  h+=`<li class="step"><div class="gut"><span class="node" style="background:var(--ink)"></span></div><div class="body"><div class="st">${nm(r.to)}</div><div class="sub">Arrive</div></div></li></ol></details>`;
+  d.innerHTML=h;
+  d.querySelector('.stepwrap').addEventListener('toggle',e=>{ stepsOpen=e.target.open; });
+  d.querySelectorAll('[data-rmvia]').forEach(b=>b.onclick=()=>{ const v=vias.slice(); v.splice(+b.dataset.rmvia,1); setCustom(v.length?routeVia([r.from,...v,r.to]):null); });
+  const dc=d.querySelector('#discardCustom'); if(dc) dc.onclick=()=>setCustom(null);
+}
+/* ---------- Custom route (drag to reroute) ---------- */
+function setCustom(r){
+  routes=baseRoutes.slice();
+  if(r){ r.custom=true; routes.push(r); sel=routes.length-1; } else sel=0;
+  renderResults(); showRoute(sel,false);
+}
+function applyVia(sid,moveIdx){
+  const r=routes[sel]; const pts=r.points||[r.from,r.to]; const from=pts[0], to=pts[pts.length-1], vias=pts.slice(1,-1);
+  if(sid===from||sid===to){ msg('That station is already the start or end of this trip. Drop the route on a different station.'); return; }
+  let best=null;
+  if(moveIdx!=null){ const v=vias.slice(); v[moveIdx]=sid; if(v.filter(x=>x===sid).length>1){ msg('The route already goes via that station.'); return; } best=routeVia([from,...v,to]); }
+  else {
+    if(vias.includes(sid)){ msg('The route already goes via that station.'); return; }
+    if(vias.length>=5){ msg('A route can have up to 5 via stations. Remove one first.'); return; }
+    for(let i=0;i<=vias.length;i++){ const v=vias.slice(); v.splice(i,0,sid); const c=routeVia([from,...v,to]); if(c&&(!best||c.cost<best.cost)) best=c; }
+  }
+  if(!best){ msg(`No rail route could be found via ${STN.get(sid).name}.`); return; }
+  msg(''); setCustom(best);
+}
+const SNAP=[]; STN.forEach(S=>S.occ.forEach(o=>{ const [x,y]=stopPos(o.li,o.si); SNAP.push({id:S.id,x,y}); }));
+function nearestStation(p,px){ const lim=px/svg.getScreenCTM().a; let best=null,bd=lim;
+  SNAP.forEach(s=>{ const d=Math.hypot(s.x-p.x,s.y-p.y); if(d<bd){ bd=d; best=s; } }); return best; }
+let rdrag=null;
+routeHits.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='mouse'&&e.button!==0) return;
+  const via=e.target.closest('.via-m'); const hit=via||e.target.closest('.route-hit'); if(!hit) return;
+  e.stopPropagation(); e.preventDefault(); cancelAnimationFrame(anim);
+  const p0=toSvg(e.clientX,e.clientY);
+  rdrag={id:e.pointerId,sx:e.clientX,sy:e.clientY,p0,moveIdx:via?+via.dataset.via:null,moved:false,snap:null};
+  if(via){ const c=via.querySelector('circle'); rdrag.p0={x:+c.getAttribute('cx'),y:+c.getAttribute('cy')}; }
+  svg.classList.add('dragging');
+});
+window.addEventListener('pointermove',e=>{
+  if(!rdrag||e.pointerId!==rdrag.id) return;
+  if(!rdrag.moved&&Math.hypot(e.clientX-rdrag.sx,e.clientY-rdrag.sy)<6) return;
+  rdrag.moved=true; const p=toSvg(e.clientX,e.clientY); const sn=nearestStation(p,34); rdrag.snap=sn;
+  dragG.replaceChildren(); const q=sn||p;
+  el('path',{d:`M${rdrag.p0.x},${rdrag.p0.y} L${q.x},${q.y}`,class:'ghost'},dragG);
+  if(sn){ el('circle',{cx:sn.x,cy:sn.y,r:20,class:'snap'},dragG); const t=el('text',{x:sn.x+26,y:sn.y-18,class:'snap-lbl'},dragG); t.textContent='Via '+STN.get(sn.id).name; hint(`Release to travel via ${STN.get(sn.id).name}`); }
+  else { el('circle',{cx:p.x,cy:p.y,r:9,class:'ghost-dot'},dragG); hint('Drop the route on a station'); }
+});
+const endRouteDrag=e=>{
+  if(!rdrag||e.pointerId!==rdrag.id) return;
+  const d=rdrag; rdrag=null; dragG.replaceChildren(); svg.classList.remove('dragging');
+  if(e.type==='pointercancel') return;
+  if(!d.moved){ const s=nearestStation(d.p0,24); if(s) stationTap(s.id); return; }
+  if(d.snap) applyVia(d.snap.id,d.moveIdx); else hint('Drop the route on a station to reroute it.');
+};
+window.addEventListener('pointerup',endRouteDrag); window.addEventListener('pointercancel',endRouteDrag);
+function hint(t){ document.getElementById('hint').textContent=t; }
+
+/* ---------- Legend ---------- */
+const legendEl=document.getElementById('legend');
+legendEl.innerHTML=LINES.map((L,i)=>`<li><button type="button" data-li="${i}" aria-pressed="false">${badgeHTML(L,true)}<span>${esc(L.name)}</span><span class="kind">${L.stops.length}</span></button></li>`).join('');
+function setLegend(li){ legendEl.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.li===li))); }
+legendEl.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; const li=+b.dataset.li;
+  if(b.getAttribute('aria-pressed')==='true'){ setLegend(null); if(routes.length&&!resultsEl.hidden) showRoute(sel,true); else { clearOverlay(); currentFocus=null; animateTo(FULL); } return; }
+  setLegend(li); const box=drawLineFocus(li); currentFocus=box; animateTo(box); hint(`Showing ${LINES[li].name}. Tap it again to go back.`); });
+
+/* ---------- Tap stations on the map ---------- */
+hits.addEventListener('click',e=>{ if(moved>8) return; const c=e.target.closest('[data-sid]'); if(!c) return; stationTap(c.dataset.sid); });
+function stationTap(id){
+  if(!fromInput.dataset.sid||(fromInput.dataset.sid&&toInput.dataset.sid)){ setField(fromInput,id); toInput.value=''; delete toInput.dataset.sid; msg(''); hint(`Origin set to ${STN.get(id).name}. Tap a destination.`); }
+  else { setField(toInput,id); search(); }
+}
+
+/* ---------- Boot ---------- */
+drawBase(); applyVB();
+setField(fromInput,EXAMPLE[0]); setField(toInput,EXAMPLE[1]); search();
+hint('Example trip loaded. Search your own route in the panel.');
+</script>
+
+</body>
+</html>
