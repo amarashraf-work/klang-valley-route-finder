@@ -89,6 +89,8 @@ h1{margin:0;font-family:var(--label);font-weight:700;font-size:28px;line-height:
 .summary{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
 .summary b{color:var(--ink);font-weight:600}
 .note{font-size:13px;color:var(--muted);margin:0}
+.note a{color:var(--accent);text-underline-offset:2px}
+.unofficial{font-size:13px;color:var(--muted)}
 
 .steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .step{display:grid;grid-template-columns:28px 1fr;column-gap:12px;position:relative}
@@ -175,6 +177,7 @@ h1{margin:0;font-family:var(--label);font-weight:700;font-size:28px;line-height:
       <div class="brand">
         <span class="eyebrow">Klang Valley integrated rail</span>
         <h1>Route Finder</h1>
+        <span class="unofficial">Unofficial trip planner</span>
       </div>
 
       <form id="tripForm" class="trip" autocomplete="off" novalidate>
@@ -210,6 +213,7 @@ h1{margin:0;font-family:var(--label);font-weight:700;font-size:28px;line-height:
         <ul id="legend"></ul>
       </section>
       <p class="note">Travel times are estimates that include average waiting and walking time. Tap a station on the map to use it as your origin or destination.</p>
+      <p class="note">This is an unofficial, independent tool. It is not affiliated with or endorsed by Prasarana Malaysia, Rapid KL, KTM Berhad or Express Rail Link. Station and line data are based on the 2026 Klang Valley Integrated Transit Map and may be out of date. Check <a href="https://myrapid.com.my" target="_blank" rel="noopener">myrapid.com.my</a> for official routes, fares and service updates.</p>
      </div>
     </div>
   </aside>
